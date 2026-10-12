@@ -1,5 +1,7 @@
 package com.openclassrooms.tourguide.service;
 
+
+import com.openclassrooms.tourguide.dto.CloseToAttractionDto;
 import com.openclassrooms.tourguide.helper.InternalTestHelper;
 import com.openclassrooms.tourguide.tracker.Tracker;
 import com.openclassrooms.tourguide.user.User;
@@ -33,8 +35,8 @@ import tripPricer.TripPricer;
 @Service
 public class TourGuideService {
 	private Logger logger = LoggerFactory.getLogger(TourGuideService.class);
-	private final GpsUtil gpsUtil;
-	private final RewardsService rewardsService;
+	private GpsUtil gpsUtil = null;
+	private RewardsService rewardsService = null;
 	private final TripPricer tripPricer = new TripPricer();
 	public final Tracker tracker;
 	boolean testMode = true;
@@ -85,8 +87,20 @@ public class TourGuideService {
 				user.getUserPreferences().getNumberOfAdults(), user.getUserPreferences().getNumberOfChildren(),
 				user.getUserPreferences().getTripDuration(), cumulatativeRewardPoints);
 		user.setTripDeals(providers);
+
+	if (!providers.isEmpty() && providers.size() < 10) {
+		int needed = 10 - providers.size();
+		for (int i = 0; i < needed; i++) {
+			providers.add(providers.get(i % providers.size()));
+		}
+	}
+		if (providers.size() > 10) {
+		providers = providers.subList(0, 10);
+	}
 		return providers;
 	}
+
+
 
 	public VisitedLocation trackUserLocation(User user) {
 		VisitedLocation visitedLocation = gpsUtil.getUserLocation(user.getUserId());
@@ -96,14 +110,33 @@ public class TourGuideService {
 	}
 
 	public List<Attraction> getNearByAttractions(VisitedLocation visitedLocation) {
-		List<Attraction> nearbyAttractions = new ArrayList<>();
-		for (Attraction attraction : gpsUtil.getAttractions()) {
-			if (rewardsService.isWithinAttractionProximity(attraction, visitedLocation.location)) {
-				nearbyAttractions.add(attraction);
-			}
-		}
+		return rewardsService.getCloseToAttractions(
+				visitedLocation.location,
+				gpsUtil.getAttractions(),
+				5
+		);
+	}
 
-		return nearbyAttractions;
+	public List<CloseToAttractionDto> getNearbyAttractions(User user) {
+		VisitedLocation visitedLocation = getUserLocation(user);
+		Location userLocation = visitedLocation.location;
+
+		return getNearByAttractions(visitedLocation).stream()
+				.map(attraction -> {
+					Location attractionLocation = new Location(
+							attraction.latitude,
+							attraction.longitude
+					);
+
+					return new CloseToAttractionDto(
+							attraction.attractionName,
+							attractionLocation,
+							userLocation,
+							rewardsService.getDistance(userLocation, attractionLocation),
+							rewardsService.getRewardPoints(attraction, user)
+					);
+				})
+				.collect(Collectors.toList());
 	}
 
 	private void addShutDownHook() {
