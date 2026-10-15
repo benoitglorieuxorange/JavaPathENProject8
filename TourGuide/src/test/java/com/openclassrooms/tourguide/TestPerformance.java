@@ -94,12 +94,21 @@ public class TestPerformance {
 		stopWatch.start();
 		TourGuideService tourGuideService = new TourGuideService(gpsUtil, rewardsService);
 
+		tourGuideService.tracker.stopTracking();
+
 		Attraction attraction = gpsUtil.getAttractions().get(0);
 		List<User> allUsers = new ArrayList<>();
 		allUsers = tourGuideService.getAllUsers();
 		allUsers.forEach(u -> u.addToVisitedLocations(new VisitedLocation(u.getUserId(), attraction, new Date())));
 
-		allUsers.forEach(u -> rewardsService.calculateRewards(u));
+		//allUsers.forEach(u -> rewardsService.calculateRewards(u));
+
+		List<CompletableFuture<Void>> futures = allUsers.stream()
+				.map(rewardsService::calculateRewardsAsync)
+				.collect(Collectors.toList());
+
+		CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
 
 		for (User user : allUsers) {
 			assertTrue(user.getUserRewards().size() > 0);
