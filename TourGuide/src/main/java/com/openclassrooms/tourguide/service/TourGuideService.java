@@ -42,6 +42,7 @@ public class TourGuideService {
 	private RewardsService rewardsService = null;
 	private final TripPricer tripPricer = new TripPricer();
 	public final Tracker tracker;
+	boolean testMode = true;
 
 
 	//Ajout d'un executorService pour le suivi des utilisateurs
@@ -55,7 +56,12 @@ public class TourGuideService {
 		
 		Locale.setDefault(Locale.US);
 
-		initializeInternalUsers();
+		if (testMode) {
+			logger.info("TestMode enabled");
+			logger.debug("Initializing users");
+			initializeInternalUsers();
+			logger.debug("Finished initializing users");
+		}
 
 		tracker = new Tracker(this);
 		addShutDownHook();
